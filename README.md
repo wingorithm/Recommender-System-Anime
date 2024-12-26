@@ -109,6 +109,56 @@ Untuk mengatasi tantangan explorasi / rekomendasi anime, sistem ini menerapkan d
   - Anime Title: Judul anime.
   - rating: Peringkat yang diberikan pengguna untuk anime.
 
+Setelah memahami dataset kemudian 3 dataset diatas perlu evaluasi awal untuk mengidentifikasi masalah data yang dapat memengaruhi hasil analisis, sebelum melanjutkan ke tahap data preparation.
+
+```python
+  duplicates_score = df_score.duplicated().sum()
+  duplicates_user = df_user.duplicated().sum()
+  duplicates_anime = df_anime.duplicated().sum()
+
+  missing_values_score = df_score.isnull().sum().sum()
+  missing_values_user = df_user.isnull().sum().sum()
+  missing_values_anime = df_anime.isnull().sum().sum()
+
+  nan_values_score = df_score.isna().sum().sum()
+  nan_values_user = df_user.isna().sum().sum()
+  nan_values_anime = df_anime.isna().sum().sum()
+```
+1. Pengecekan Duplikasi
+Dataset diperiksa untuk keberadaan baris duplikat menggunakan metode `.duplicated()`.
+
+Hasil: Dataset tidak memiliki {duplicates} baris duplikat, yang dapat memengaruhi kualitas model jika tidak ditangani.
+
+2. Pengecekan Missing Values
+Dataset diperiksa untuk nilai yang hilang (missing values) menggunakan fungsi `.isnull().sum()`.
+
+Hasil: Tidak terdapat {missing_values} missing values di dataset.
+
+3. Pengecekan NaN Values
+Dataset juga diperiksa untuk keberadaan nilai NaN menggunakan fungsi `.isna().sum()`.
+
+Hasil: Tidak terdapat {nan_values} nilai NaN di dataset.
+
+```
+The data has issues:
+There are 232 missing values in df_score.
+There are 1648695 missing values in df_user.
+There are 232 NaN values in df_score.
+There are 1648695 NaN values in df_user.
+```
+
+Dari hasil evaluasi awal didapati bahwa data-data yang diperoleh tidak sepenuhnya bersih, hal ini dicatat dan akan dilakukan data cleaning pada tahap preprocessing. Selain memahami deskripsi setiap fiturnya, *Exploratory Data Analysis* (EDA) sebagai investigasi awal untuk menganalisis karakteristik, menemukan pola, anomali, dan memeriksa asumsi pada data dengan menggunakan teknik statistik dan representasi grafis atau visualisasi juga dilakukan.
+
+1. **Univariate Analysis**
+
+![image](https://github.com/user-attachments/assets/7016ae26-2016-4049-bf59-a2e2baf4e3e2)
+
+2. **Multivariate Analysis**
+
+![image](https://github.com/user-attachments/assets/e7a3d89b-341d-4069-ae59-9f7a24f60fa9)
+![image](https://github.com/user-attachments/assets/9d32e446-35e3-42b5-af57-9f7e4e763e2c)
+
+
 ## Data Preparation
 
 ## Modeling
