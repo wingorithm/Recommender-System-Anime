@@ -236,7 +236,7 @@ X_test_array = [X_test[:, 0], X_test[:, 1]]
    melakukan pengacakan pada dataset `df_score_cleaned` untuk memastikan keacakan. Serta membagi data menjadi set pelatihan (80%) dan pengujian (20%). Hal ini dilakukan karena pengacakan mengurangi bias selama pelatihan dengan mencampur titik data dari distribusi yang berbeda. Memisahkan set data memberikan metrik evaluasi yang tidak bias untuk kinerja model pada data yang tidak terlihat.
    
 ## Modeling
-Pada tahap ini...
+Pada tahap ini data yang telah dipersiapan akan digunakan untuk data latih bagi model recommender dan fungsi-fungsi recommendeer
 
 ### 1. Arsitektur Model
 ```python
@@ -360,7 +360,12 @@ $$MAE=\frac{1}{N}\sum_{i=1}^{N}|y_i-\hat{y}_i|$$
 ![image](https://github.com/user-attachments/assets/2d12826e-b66e-43df-9cd4-f8bf3b5e5270)
 
 ## Kesimpulan
-
+Dari evaluasi yang dilakukan, ditemukan bahwa:
+- Hasil evaluasi model menunjukkan bahwa seluruh metrics penilaian `RMSE`, `MAE`, `Validation Loss`, mengalami perbaikan seiring dengan bertambahnya epoch. hal ini juga dibuktikan dengan hasil pengujian _User Based Recommendation Function_, dan _Item Based Recommendation Function_ yng berhsail memberikan top-N recommendation sebagai output.
+- Dalam penelitian ini data telah diproses dan disiapkan dengan baik melalui langkah-langkah seperti _Handling Unknown Values_, _Handling Missing Values_, _Feature Scaling_, _Encoding Identifiers_, _Shuffling and Splitting Data_. Alhasil dapat digunakan dengan baik pada tahap pelatihan dan pengujian.
+- Dari penelitian ini dapat dilihat bahwa pendekatan _machine learning_ dalam hal model weight dan fungsi recommender berdampak untuk menginkatkan efesiensi rekomendasi judul anime kepada pengguna berdasarkan preferensi user / judul anime.
+     
+Evaluasi ini tidak hanya menunjukkan performa teknis tetapi juga relevansi model dengan kebutuhan bisnis, menjawab pertanyaan inti, dan memberikan manfaat ekonomi bagi penyedia platform streaming dan meningkatkan kepuasan pengalaman pengguna.
 
 ## Reference
 [1] 800 million and growing, why everyone wants a piece of the anime action? -> https://www.smh.com.au/culture/movies/800-million-and-growing-why-everyone-wants-a-piece-of-the-anime-action-20240314-p5fcek.html
