@@ -236,16 +236,139 @@ X_test_array = [X_test[:, 0], X_test[:, 1]]
    melakukan pengacakan pada dataset `df_score_cleaned` untuk memastikan keacakan. Serta membagi data menjadi set pelatihan (80%) dan pengujian (20%). Hal ini dilakukan karena pengacakan mengurangi bias selama pelatihan dengan mencampur titik data dari distribusi yang berbeda. Memisahkan set data memberikan metrik evaluasi yang tidak bias untuk kinerja model pada data yang tidak terlihat.
    
 ## Modeling
+Pada tahap ini...
+
+### 1. Arsitektur Model
+```python
+def root_mean_squared_error(y_true, y_pred):
+    return tf.sqrt(tf.reduce_mean(tf.square(y_pred - y_true)))
+
+def RecommenderNet(num_users, num_animes, embedding_size=128):
+    user = Input(name='user_encoded', shape=[1])
+    user_embedding = Embedding(
+        name='user_embedding', input_dim=num_users, output_dim=embedding_size
+    )(user)
+
+    anime = Input(name='anime_encoded', shape=[1])
+    anime_embedding = Embedding(
+        name='anime_embedding', input_dim=num_animes, output_dim=embedding_size
+    )(anime)
+
+    dot_product = Dot(name='dot_product', normalize=True, axes=2)([user_embedding, anime_embedding])
+    flattened = Flatten()(dot_product)
+
+    dense = Dense(64, activation='relu')(flattened)
+    output = Dense(1, activation='sigmoid')(dense)
+
+    model = Model(inputs=[user, anime], outputs=output)
+    model.compile(
+        loss='mean_squared_error',
+        optimizer=Adam(learning_rate=0.001),
+        metrics=[root_mean_squared_error, MeanAbsoluteError()]
+    )
+    return model
+
+model = RecommenderNet(num_users, num_animes)
+model.summary()
+```
+   Sistem rekomendasi dirancang untuk memprediksi interaksi antara pengguna dan judul anime menggunakan embedding-based neural network architecture.. Berikut ini adalah penjelasan terperinci dari komponen model:
+
+- Input:
+
+   User Input: Satu bilangan bulat yang mewakili encoded userID.
+   Anime Input: Satu bilangan bulat yang mewakili encoded animeID.
+
+- Embeddings:
+
+   User Embedding Layer: Memetakan User Input ke dalam representasi vektor padat dengan embedding size yang dapat dikonfigurasi (default adalah 128).
+   Anime Embedding Layer: Memetakan anime input ke dalam representasi vektor padat dengan embedding size yang sama dengan user embedding.
+
+- Dot Product:
+
+   Menghitung produk titik dari penyematan pengguna dan anime. Operasi ini menangkap kesamaan antara pengguna dan anime di ruang laten.
+   Dot Product dinormalisasi, memastikan bahwa output tetap dalam rentang yang konsisten.
+
+- Flattening:
+  
+   Hasil perkalian titik diratakan menjadi tensor 1 dimensi, sehingga kompatibel dengan lapisan padat berikutnya.
+
+- Dense Layers:
+  
+   First Dense Layer: fully connected layer dengan _x_ (64) unit dan aktivasi ReLU. Lapisan ini menangkap hubungan non-linier antara fitur laten.
+   Output Layer: fully connected layer dengan satu unit dan aktivasi sigmoid. Aktivasi sigmoid menskalakan keluaran ke rentang 0 hingga 1, yang mewakili skor interaksi yang diprediksi.
+
+- Compilation:
+
+   - Loss Function:  Model menggunakan Mean Squared Error (MSE) untuk meminimalkan perbedaan antara skor interaksi yang diprediksi dan aktual.
+   - Metrics: Dua metrik evaluasi didefinisikan:
+     - Root Mean Squared Error (RMSE): Mengukur akar kuadrat dari rata-rata perbedaan kuadrat antara prediksi dan nilai sebenarnya.
+     - Mean Absolute Error (MAE): Menghitung rata-rata perbedaan absolut antara prediksi dan nilai sebenarnya.
+   - Optimizer: Menggunakan Adam dengan tingkat lr awal 0,001.
+
+- Callback Mechanisms
+  
+   Selama pelatihan, beberapa mekanisme panggilan balik diterapkan untuk meningkatkan kinerja, mengelola tingkat pembelajaran, dan mencegah overfitting:
+   - Learning Rate Scheduler (lr_callback)
+   - Model Checkpoints (model_checkpoints)
+   - dan Early Stopping (early_stopping)
+
+### 2. Recommender Function
+- Item Based Recommendation Function
+![image](https://github.com/user-attachments/assets/d862994b-78ff-4248-a601-6762a3dc0ddf)
+
+   Dalam fungsi ini, saya menetapkan ambang batas untuk merekomendasikan hanya anime yang telah dinilai oleh sejumlah pengguna minimum. Ini memastikan bahwa anime yang direkomendasikan telah menerima cukup banyak penilaian, yang mencerminkan tingkat popularitas atau keterlibatan pengguna tertentu. Fungsi ini akan mencari top-N similar animes berdasarkan cosine similarity dari embeddings.
+
+- User Based Recommendation Function
+
+![image](https://github.com/user-attachments/assets/3a9d28a4-d6a7-4525-bd5e-4a8e273fb9e8)
+![image](https://github.com/user-attachments/assets/306d60c9-bfa4-464f-8a4f-2f6a8569032a)
+
+   Dalam fungsi ini setidaknya ada 3 tahapan. Pertama fungsi `find_similar_users` akan mencari user yang paling mendekati random user yang di generate. Fungsi ini menghitung tingkat kesamaan melalui weighted matrix dan mengembalikan DataFrame user. Kedua fungsi `get_user_preferences` menggunakan user dari function pertama, dan menganalisis anime-anime yang dinilai bagus oleh si user, dan memvisualisasikan itu kedalam word cloud, yang menjadi gambaran genres apa yang dipreferensikan. Ketiga fungsi `recommend_animes_by_user` akan merekomendasikan judul anime kepada user yang di input sesuai dengan preferensi user yang mendekatinya. FUngsi ini menyaring anime yang telah ditonton oleh pengguna terpilih dan mengidentifikasi rekomendasi baru berdasarkan preferensi pengguna serupa.
 
 ## Evaluation
 
+   Berdasarkan model machine learning yang sudah dibangun menggunakan embedding layer dengan Adam optimizer dan mean squared error loss function, metrik yang digunakan untuk mengevaluasi kinerja model adalah **Root Mean Squared Error (RMSE)**, **Mean Absolute Error (MAE)**, dan **Validation Loss**. 
+
+- Root Mean Squared Error (RMSE)
+
+   Perhitungan RMSE dapat dilakukan menggunakan rumus berikut:
+
+$$RMSE=\sqrt{\frac{1}{N}\sum_{i=1}^{N}(y_i-\hat{y}_i)^2}$$
+
+   Dimana: $$\( N \)$$ adalah jumlah data, $$\( y_i \)$$ adalah nilai observasi (nilai sebenarnya), $$\( \hat{y}_i \)$$ adalah nilai prediksi.
+
+   Hasil nilai RMSE yang rendah menunjukkan bahwa variasi nilai yang dihasilkan dari model sistem rekomendasi mendekati variasi nilai observasinya. Artinya, semakin kecil nilai RMSE, maka akan semakin dekat nilai yang diprediksi dan diamati.
+
+- Mean Absolute Error (MAE)
+
+   Metrik lainnya yang digunakan untuk mengevaluasi model adalah **Mean Absolute Error (MAE)**, yang dapat dihitung menggunakan rumus berikut:
+
+$$MAE=\frac{1}{N}\sum_{i=1}^{N}|y_i-\hat{y}_i|$$
+
+   Dimana: $$\( N \)$$ adalah jumlah data, $$\( y_i \)$$ adalah nilai observasi, $$\( \hat{y}_i \)$$ adalah nilai prediksi.
+
+   MAE memberikan gambaran tentang seberapa besar kesalahan rata-rata yang terjadi antara nilai prediksi dan nilai sebenarnya. Nilai MAE yang lebih kecil menunjukkan model yang lebih akurat dalam memprediksi.
+
+- Validation Loss
+
+   **Validation Loss** mengukur kesalahan model pada data yang tidak terlihat sebelumnya selama proses training. Pengukuran ini membantu dalam menilai apakah model mengalami overfitting atau underfitting.
+
+   Pada model yang digunakan, **binary crossentropy** digunakan sebagai fungsi loss, yang menunjukkan seberapa baik model dalam memprediksi kategori yang benar.
+
+   Berikut adalah visualisasi hasil **training** dan **validation error** dari metrik **RMSE**, **MAE**, serta **training** dan **validation loss** dalam bentuk grafik plot:
+
+![image](https://github.com/user-attachments/assets/2d12826e-b66e-43df-9cd4-f8bf3b5e5270)
+
+## Kesimpulan
+
+
 ## Reference
-[1] 800 million and growing, why everyone wants a piece of the anime action? - https://www.smh.com.au/culture/movies/800-million-and-growing-why-everyone-wants-a-piece-of-the-anime-action-20240314-p5fcek.html
+[1] 800 million and growing, why everyone wants a piece of the anime action? -> https://www.smh.com.au/culture/movies/800-million-and-growing-why-everyone-wants-a-piece-of-the-anime-action-20240314-p5fcek.html
 
-[2] Anime Market Size, Share & Trends Analysis Report By Type - https://www.grandviewresearch.com/industry-analysis/anime-market/toc
+[2] Anime Market Size, Share & Trends Analysis Report By Type -> https://www.grandviewresearch.com/industry-analysis/anime-market/toc
 
-[3] Anime Market Research Report 2024 - https://finance.yahoo.com/news/anime-market-research-report-2024-080300191.html?guccounter=1
+[3] Anime Market Research Report 2024 -> https://finance.yahoo.com/news/anime-market-research-report-2024-080300191.html?guccounter=1
 
-[4] netflix recommendation engine worth 1 billion per year - https://www.businessinsider.com/netflix-recommendation-engine-worth-1-billion-per-year-2016-6
+[4] netflix recommendation engine worth 1 billion per year -> https://www.businessinsider.com/netflix-recommendation-engine-worth-1-billion-per-year-2016-6
 
-[5] Netflix Recommender system - Case Study - https://www.linkedin.com/pulse/netflix-recommender-system-case-study-ashish-gupta/
+[5] Netflix Recommender system - Case Study -> https://www.linkedin.com/pulse/netflix-recommender-system-case-study-ashish-gupta/
