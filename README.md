@@ -153,14 +153,88 @@ Dari hasil evaluasi awal didapati bahwa data-data yang diperoleh tidak sepenuhny
 
 ![image](https://github.com/user-attachments/assets/7016ae26-2016-4049-bf59-a2e2baf4e3e2)
 
+Dari analisis data univariat, diperoleh beberapa informasi berikut:
+- Sebagian besar rank anime terkonsentrasi antara 7 dan 10, yang menunjukkan kecenderungan ke arah peringkat yang lebih tinggi. Frekuensi meningkat secara signifikan pada nilai integer, yang menunjukkan pengguna sering memberikan peringkat bilangan bulat.
+-Genre yang paling populer adalah Komedi, Fantasi, dan Petualangan, dengan Komedi mendominasi jumlah tersebut. Genre seperti Ero dan Grimace adalah yang paling sedikit terwakili, yang menunjukkan audiens yang lebih kecil atau judul yang lebih sedikit.
+- Anime TV adalah jenis yang paling umum, diikuti oleh Film dan OVA. Anime Spesial dan Musik lebih jarang.
+- Mayoritas data mencantumkan produser sebagai UNKNOWN, yang menunjukkan data yang hilang atau tidak bersih secara signifikan. Di antara produser yang teridentifikasi, Pink Pineapple dan TNK memiliki jumlah yang lebih tinggi.
+- Pengguna Pria mendominasi kumpulan data, diikuti oleh pengguna Wanita.
+- Polandia memiliki jumlah pengguna tertinggi, diikuti oleh Jerman dan Kanada. 
+
 2. **Multivariate Analysis**
 
 ![image](https://github.com/user-attachments/assets/e7a3d89b-341d-4069-ae59-9f7a24f60fa9)
 ![image](https://github.com/user-attachments/assets/9d32e446-35e3-42b5-af57-9f7e4e763e2c)
 
+Heatmap korelasi (Correlation Matrix) memberikan beberapa wawasan penting:
+- _Feature_ seperti Favorit dan Anggota saling terkait erat, yang menunjukkan bahwa keduanya menangkap _engagement behavior_ yang serupa.
+- `Popularity` tampaknya memiliki hubungan yang beragam, dipengaruhi secara positif oleh faktor-faktor seperti `studio` dan `genre` tetapi secara negatif oleh jumlah `membership `.
+- Korelasi yang lemah di antara pasangan fitur lainnya menunjukkan ketergantungan langsung yang terbatas, yang mungkin menunjukkan bahwa fitur-fitur ini menangkap aspek-aspek berbeda dari data anime.
 
 ## Data Preparation
+Sebelum membangun model recommendation, dilakukan beberapa langkah _data preparation_ untuk memastikan kualitas data dan kompatibilitas dengan algoritma _neural network-based recommender system model_. Berikut adalah proses dan hasil dari tahap data preparation berdasarkan kode yang digunakan:
 
+```python
+df_anime_cleaned = df_anime[df_anime['Genres'] != 'Unknown']
+df_anime_cleaned = df_anime_cleaned[df_anime_cleaned['Type'] != 'Unknown']
+```
+
+1. Handling Unknown Values
+
+   Menghapus baris-baris di `df_anime` pada kolom `Genres` atau `type` berisi "Unknown". Hal ini diperlukan karena keberadaan nilai "Unknown" menimbulkan gangguan ke dalam kumpulan data, nilai-nilai ini tidak memberikan informasi yang berguna bagi model. Menghapus baris-baris ini memastikan bahwa model berfokus pada atribut yang valid dan bermakna.
+
+```python
+df_user_cleaned = df_user.drop(columns=['Gender', 'Birthday', 'Location'])
+columns_to_impute = ['Days Watched', 'Mean Score', 'Watching', 'Completed',
+                     'On Hold', 'Dropped', 'Plan to Watch', 'Total Entries',
+                     'Rewatched', 'Episodes Watched']
+for col in columns_to_impute:
+    df_user_cleaned[col].fillna(df_user_cleaned[col].median(), inplace=True)
+
+df_score_cleaned = df_score.dropna(subset=['Username'])
+```
+
+2. Handling Missing Values
+
+   pada `df_user`, kolom seperti `Gender`, `Birthday`, dan `Location` di hapus karena mengandung sangat banyak missing values. Hal ini juga menimbang bahwa kolom-kolom ini tidak digunakan pada training karena rendahnya relevansi. untuk _feature numeric_ pada `df_user`, seperti `Days Watched`, dll, missing values di isi dengan median. Pada `df_score`, baris data dengan _missing values_ pada kolom kritikal (Username) di hapus.
+
+   Hal ini dilakukan karena proporsi data yang hilang dalam kolom categorical yang tinggi membuat imputasi tidak dapat diandalkan. Menghilangkan kolom-kolom ini menghindari pengenalan informasi yang bias atau keliru. Untuk kolom numeric, imputasi median memastikan bahwa data yang hilang diisi tanpa distribusi yang menyimpang, sehingga membuat kumpulan data menjadi _robust_ untuk pelatihan model. Menghapus baris yang tidak lengkap dalam `df_score` memastikan data pelatihan konsisten dan akurat
+
+```python
+scaler = MinMaxScaler(feature_range=(0, 1))
+
+df_score_cleaned['scaled_score'] = scaler.fit_transform(df_score_cleaned[['rating']])
+```
+
+3. Feature Scaling
+
+   Menskalakan kolom peringkat di `df_score` menggunakan `MinMaxScaler` untuk menormalkan nilai antara 0 dan 1. Hal ini dilakuan karena penskalaan fitur numerik membantu model menyatu lebih cepat selama pelatihan dan memastikan bahwa fitur-fitur tersebut sebanding. Nilai yang dinormalisasi sangat penting dalam arsitektur jaringan neural untuk menghindari masalah yang disebabkan oleh _large numerical ranges_.
+
+```python
+user_encoder = LabelEncoder()
+df_score_cleaned["user_encoded"] = user_encoder.fit_transform(df_score_cleaned["user_id"])
+num_users = len(user_encoder.classes_)
+
+anime_encoder = LabelEncoder()
+df_score_cleaned["anime_encoded"] = anime_encoder.fit_transform(df_score_cleaned["anime_id"])
+num_animes = len(anime_encoder.classes_)
+```
+4. Encoding Identifiers
+
+   Melakukan proses _encoding_ pada `user_id` dan `anime_id` menggunakan `LabelEncoder`. Memetakan setiap pengguna dan anime ke bilangan bulat unik dan menyimpannya sebagai user_encoded dan anime_encoded. Hal ini diperlukan karena sistem rekomendasi beroperasi pada representasi numerik pengguna dan item. ID pengodean memastikan bahwa penyematan yang digunakan dalam jaringan saraf dipetakan dengan tepat.
+
+```python
+df_score_cleaned = shuffle(df_score_cleaned, random_state=100)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=73)
+
+X_train_array = [X_train[:, 0], X_train[:, 1]]
+X_test_array = [X_test[:, 0], X_test[:, 1]]
+```
+
+5. Shuffling and Splitting Data
+   
+   melakukan pengacakan pada dataset `df_score_cleaned` untuk memastikan keacakan. Serta membagi data menjadi set pelatihan (80%) dan pengujian (20%). Hal ini dilakukan karena pengacakan mengurangi bias selama pelatihan dengan mencampur titik data dari distribusi yang berbeda. Memisahkan set data memberikan metrik evaluasi yang tidak bias untuk kinerja model pada data yang tidak terlihat.
+   
 ## Modeling
 
 ## Evaluation
