@@ -174,25 +174,9 @@ Heatmap korelasi (Correlation Matrix) memberikan beberapa wawasan penting:
 ## Data Preparation
 Sebelum membangun model recommendation, dilakukan beberapa langkah _data preparation_ untuk memastikan kualitas data dan kompatibilitas dengan algoritma _neural network-based recommender system model_. Berikut adalah proses dan hasil dari tahap data preparation berdasarkan kode yang digunakan:
 
-```python
-df_anime_cleaned = df_anime[df_anime['Genres'] != 'Unknown']
-df_anime_cleaned = df_anime_cleaned[df_anime_cleaned['Type'] != 'Unknown']
-```
-
 1. Handling Unknown Values
 
    Menghapus baris-baris di `df_anime` pada kolom `Genres` atau `type` berisi "Unknown". Hal ini diperlukan karena keberadaan nilai "Unknown" menimbulkan gangguan ke dalam kumpulan data, nilai-nilai ini tidak memberikan informasi yang berguna bagi model. Menghapus baris-baris ini memastikan bahwa model berfokus pada atribut yang valid dan bermakna.
-
-```python
-df_user_cleaned = df_user.drop(columns=['Gender', 'Birthday', 'Location'])
-columns_to_impute = ['Days Watched', 'Mean Score', 'Watching', 'Completed',
-                     'On Hold', 'Dropped', 'Plan to Watch', 'Total Entries',
-                     'Rewatched', 'Episodes Watched']
-for col in columns_to_impute:
-    df_user_cleaned[col].fillna(df_user_cleaned[col].median(), inplace=True)
-
-df_score_cleaned = df_score.dropna(subset=['Username'])
-```
 
 2. Handling Missing Values
 
@@ -200,78 +184,30 @@ df_score_cleaned = df_score.dropna(subset=['Username'])
 
    Hal ini dilakukan karena proporsi data yang hilang dalam kolom categorical yang tinggi membuat imputasi tidak dapat diandalkan. Menghilangkan kolom-kolom ini menghindari pengenalan informasi yang bias atau keliru. Untuk kolom numeric, imputasi median memastikan bahwa data yang hilang diisi tanpa distribusi yang menyimpang, sehingga membuat kumpulan data menjadi _robust_ untuk pelatihan model. Menghapus baris yang tidak lengkap dalam `df_score` memastikan data pelatihan konsisten dan akurat
 
-```python
-scaler = MinMaxScaler(feature_range=(0, 1))
+Kondisi setelah data cleaning 
 
-df_score_cleaned['scaled_score'] = scaler.fit_transform(df_score_cleaned[['rating']])
-```
+![image](https://github.com/user-attachments/assets/d43d68ba-0e65-44c6-b2e5-99abf5e8b595)
 
 3. Feature Scaling
 
    Menskalakan kolom peringkat di `df_score` menggunakan `MinMaxScaler` untuk menormalkan nilai antara 0 dan 1. Hal ini dilakuan karena penskalaan fitur numerik membantu model menyatu lebih cepat selama pelatihan dan memastikan bahwa fitur-fitur tersebut sebanding. Nilai yang dinormalisasi sangat penting dalam arsitektur jaringan neural untuk menghindari masalah yang disebabkan oleh _large numerical ranges_.
 
-```python
-user_encoder = LabelEncoder()
-df_score_cleaned["user_encoded"] = user_encoder.fit_transform(df_score_cleaned["user_id"])
-num_users = len(user_encoder.classes_)
-
-anime_encoder = LabelEncoder()
-df_score_cleaned["anime_encoded"] = anime_encoder.fit_transform(df_score_cleaned["anime_id"])
-num_animes = len(anime_encoder.classes_)
-```
 4. Encoding Identifiers
 
    Melakukan proses _encoding_ pada `user_id` dan `anime_id` menggunakan `LabelEncoder`. Memetakan setiap pengguna dan anime ke bilangan bulat unik dan menyimpannya sebagai user_encoded dan anime_encoded. Hal ini diperlukan karena sistem rekomendasi beroperasi pada representasi numerik pengguna dan item. ID pengodean memastikan bahwa penyematan yang digunakan dalam jaringan saraf dipetakan dengan tepat.
 
-```python
-df_score_cleaned = shuffle(df_score_cleaned, random_state=100)
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=73)
-
-X_train_array = [X_train[:, 0], X_train[:, 1]]
-X_test_array = [X_test[:, 0], X_test[:, 1]]
-```
-
 5. Shuffling and Splitting Data
    
    melakukan pengacakan pada dataset `df_score_cleaned` untuk memastikan keacakan. Serta membagi data menjadi set pelatihan (80%) dan pengujian (20%). Hal ini dilakukan karena pengacakan mengurangi bias selama pelatihan dengan mencampur titik data dari distribusi yang berbeda. Memisahkan set data memberikan metrik evaluasi yang tidak bias untuk kinerja model pada data yang tidak terlihat.
-   
+
 ## Modeling
 Pada tahap ini data yang telah dipersiapan akan digunakan untuk data latih bagi model recommender dan fungsi-fungsi recommendeer
 
 ### 1. Arsitektur Model
-```python
-def root_mean_squared_error(y_true, y_pred):
-    return tf.sqrt(tf.reduce_mean(tf.square(y_pred - y_true)))
 
-def RecommenderNet(num_users, num_animes, embedding_size=128):
-    user = Input(name='user_encoded', shape=[1])
-    user_embedding = Embedding(
-        name='user_embedding', input_dim=num_users, output_dim=embedding_size
-    )(user)
+![image](https://github.com/user-attachments/assets/6ae82198-0f74-40aa-bb37-62aa1c6fa061)
 
-    anime = Input(name='anime_encoded', shape=[1])
-    anime_embedding = Embedding(
-        name='anime_embedding', input_dim=num_animes, output_dim=embedding_size
-    )(anime)
-
-    dot_product = Dot(name='dot_product', normalize=True, axes=2)([user_embedding, anime_embedding])
-    flattened = Flatten()(dot_product)
-
-    dense = Dense(64, activation='relu')(flattened)
-    output = Dense(1, activation='sigmoid')(dense)
-
-    model = Model(inputs=[user, anime], outputs=output)
-    model.compile(
-        loss='mean_squared_error',
-        optimizer=Adam(learning_rate=0.001),
-        metrics=[root_mean_squared_error, MeanAbsoluteError()]
-    )
-    return model
-
-model = RecommenderNet(num_users, num_animes)
-model.summary()
-```
-   Sistem rekomendasi dirancang untuk memprediksi interaksi antara pengguna dan judul anime menggunakan embedding-based neural network architecture.. Berikut ini adalah penjelasan terperinci dari komponen model:
+   Sistem rekomendasi dirancang untuk memprediksi interaksi antara pengguna dan judul anime menggunakan _embedding-based neural network architecture_. Berikut ini adalah penjelasan terperinci dari komponen model:
 
 - Input:
 
@@ -309,19 +245,53 @@ model.summary()
   
    Selama pelatihan, beberapa mekanisme panggilan balik diterapkan untuk meningkatkan kinerja, mengelola tingkat pembelajaran, dan mencegah overfitting:
    - Learning Rate Scheduler (lr_callback)
-   - Model Checkpoints (model_checkpoints)
-   - dan Early Stopping (early_stopping)
 
+     Pada lr_callback digunakan custom learning rate function (lrfn), dimana bertujuan untuk menyesuaikan _lr_ secara dinamis saat training berjalan. Terdiri dari 3 fase:
+     1. _Ramp-up Phase_ dimana _lr_ meningkat secara linear dari `start_lr` = 0.00001 ke `max_lr` = 0.00005 selama `rampup_epochs` = 5.
+     2. _Sustain Phase_ dimana _lr_ tetap konstan pada `max_lr` untuk `sustain_epochs` = 0 (tidak ada sustain phase).
+     3. _Exponential Decay Phase_ dimana _lr_ menurun secara eksponensial hingga ke `min_lr` = 0.00001 berdasarkan parameter `exp_decay` = 0,8.
+        
+   - Model Checkpoints (model_checkpoints)
+ 
+     Pada model_checkpoints digunakan beberapa parameter seperti:
+     1. `filepath` untuk menunjukan lokasi penyimpanan model.
+     2. `save_weights_only` diatur `True` agar checkpoint hanya menyimpan weight dari pada menyimpan seluruh model.
+     3. `monitor` diatur untuk memantau metrics `val_loss`, untuk menentukan model disimpan atau tidak.
+     4. `mode` diatur `min` agar call back akan menyimpan model ketika metrik yang dipantau (val_loss) menurun
+     5. `save_best_only` diatur `True` untuk memastikan bahwa hanya model terbaik yang disimpan.
+        
+   - dan Early Stopping (early_stopping)
+ 
+     Pada early_stopping digunakan beberapa parameter seperti:
+     1. `patience` diatur `3` agar pelatihan dihentikan saat metrik yang dipantau (val_loss) berhenti meningkat sebanyak 3 kali.
+     2. `monitor` diatur untuk memantau metrics `val_loss`.
+     3. `mode` diatur `min` agar call back akan menghentikan pelatihan ketika metrik yang dipantau (val_loss) berhenti menurun.
+     4. `restore_best_weights` diatur `True` untuk memastikan bobot model dikembalikan ke kondisi terbaik yang diamati selama pelatihan (yaitu, periode dengan val_loss terendah).
+
+- Training
+
+  Pada saat pelatihan model, ada beberapa parameter yang digunakan antara lain:
+     - `x` = input training data `X_train_array`
+     - `y` = target labels pada training data `y_train`
+     - `batch_size` = `10000` sampel data per batch yang digunakan untuk pelatihan. Batch sizes yang besar ini dipilih untuk mempercepat proses pelatihan sebab data yang digunakan sangat besar.
+     - `epochs` = `20` kali keseluruhan kumpulan data pelatihan (X_train_array dan y_train) akan dilewatkan melalui model.
+     - `verbose` = display progress
+     - `validation_data` = `X_test_array, y_test`
+     - `callbacks` = kumpulan callback fungtions sebelumnya        
+
+model.load_weights(checkpoint_filepath)
 ### 2. Recommender Function
 - Item Based Recommendation Function
-![image](https://github.com/user-attachments/assets/d862994b-78ff-4248-a601-6762a3dc0ddf)
+
+![image](https://github.com/user-attachments/assets/916273e4-1d0f-4e1b-b979-c7f376fd6426)
 
    Dalam fungsi ini, saya menetapkan ambang batas untuk merekomendasikan hanya anime yang telah dinilai oleh sejumlah pengguna minimum. Ini memastikan bahwa anime yang direkomendasikan telah menerima cukup banyak penilaian, yang mencerminkan tingkat popularitas atau keterlibatan pengguna tertentu. Fungsi ini akan mencari top-N similar animes berdasarkan cosine similarity dari embeddings.
 
 - User Based Recommendation Function
 
 ![image](https://github.com/user-attachments/assets/3a9d28a4-d6a7-4525-bd5e-4a8e273fb9e8)
-![image](https://github.com/user-attachments/assets/306d60c9-bfa4-464f-8a4f-2f6a8569032a)
+![image](https://github.com/user-attachments/assets/4dc34368-4638-44a4-9d54-82a9f7af849d)
+
 
    Dalam fungsi ini setidaknya ada 3 tahapan. Pertama fungsi `find_similar_users` akan mencari user yang paling mendekati random user yang di generate. Fungsi ini menghitung tingkat kesamaan melalui weighted matrix dan mengembalikan DataFrame user. Kedua fungsi `get_user_preferences` menggunakan user dari function pertama, dan menganalisis anime-anime yang dinilai bagus oleh si user, dan memvisualisasikan itu kedalam word cloud, yang menjadi gambaran genres apa yang dipreferensikan. Ketiga fungsi `recommend_animes_by_user` akan merekomendasikan judul anime kepada user yang di input sesuai dengan preferensi user yang mendekatinya. FUngsi ini menyaring anime yang telah ditonton oleh pengguna terpilih dan mengidentifikasi rekomendasi baru berdasarkan preferensi pengguna serupa.
 
@@ -335,7 +305,7 @@ model.summary()
 
 $$RMSE=\sqrt{\frac{1}{N}\sum_{i=1}^{N}(y_i-\hat{y}_i)^2}$$
 
-   Dimana: $$\( N \)$$ adalah jumlah data, $$\( y_i \)$$ adalah nilai observasi (nilai sebenarnya), $$\( \hat{y}_i \)$$ adalah nilai prediksi.
+   Dimana: $$(N)$$ adalah jumlah data, $$(y_i)$$ adalah nilai observasi (nilai sebenarnya), $$(\hat{y}_i)$$ adalah nilai prediksi.
 
    Hasil nilai RMSE yang rendah menunjukkan bahwa variasi nilai yang dihasilkan dari model sistem rekomendasi mendekati variasi nilai observasinya. Artinya, semakin kecil nilai RMSE, maka akan semakin dekat nilai yang diprediksi dan diamati.
 
@@ -345,7 +315,7 @@ $$RMSE=\sqrt{\frac{1}{N}\sum_{i=1}^{N}(y_i-\hat{y}_i)^2}$$
 
 $$MAE=\frac{1}{N}\sum_{i=1}^{N}|y_i-\hat{y}_i|$$
 
-   Dimana: $$\( N \)$$ adalah jumlah data, $$\( y_i \)$$ adalah nilai observasi, $$\( \hat{y}_i \)$$ adalah nilai prediksi.
+   Dimana: $$(N)$$ adalah jumlah data, $$(y_i)$$ adalah nilai observasi, $$(\hat{y}_i)$$ adalah nilai prediksi.
 
    MAE memberikan gambaran tentang seberapa besar kesalahan rata-rata yang terjadi antara nilai prediksi dan nilai sebenarnya. Nilai MAE yang lebih kecil menunjukkan model yang lebih akurat dalam memprediksi.
 
@@ -355,13 +325,16 @@ $$MAE=\frac{1}{N}\sum_{i=1}^{N}|y_i-\hat{y}_i|$$
 
    Pada model yang digunakan, **binary crossentropy** digunakan sebagai fungsi loss, yang menunjukkan seberapa baik model dalam memprediksi kategori yang benar.
 
-   Berikut adalah visualisasi hasil **training** dan **validation error** dari metrik **RMSE**, **MAE**, serta **training** dan **validation loss** dalam bentuk grafik plot:
+   Berikut adalah nilai evaluasi dan visualisasi hasil **training** dan **validation error** dari metrik **RMSE**, **MAE**, serta **training** dan **validation loss** dalam bentuk grafik plot:
 
-![image](https://github.com/user-attachments/assets/2d12826e-b66e-43df-9cd4-f8bf3b5e5270)
+![image](https://github.com/user-attachments/assets/25ea6a48-68fd-4540-80ce-9a8b0845021b)
+![image](https://github.com/user-attachments/assets/bc9b8b86-d7fc-42fa-990b-de4ece4fa31e)
+
 
 ## Kesimpulan
 Dari evaluasi yang dilakukan, ditemukan bahwa:
-- Hasil evaluasi model menunjukkan bahwa seluruh metrics penilaian `RMSE`, `MAE`, `Validation Loss`, mengalami perbaikan seiring dengan bertambahnya epoch. hal ini juga dibuktikan dengan hasil pengujian _User Based Recommendation Function_, dan _Item Based Recommendation Function_ yng berhsail memberikan top-N recommendation sebagai output.
+- Hasil evaluasi model menunjukkan bahwa metrics penilaian `MAE`, `Validation Loss`, menunjukkan penurunan yang stabil, yang menunjukkan model belajar untuk meminimalkan kesalahan. Namun untuk metrics `RMSE` pelatihan menurun secara konsisten di awal tetapi sedikit meningkat setelah epoch ke 5. Nilai-nilai metrics seperti (MSE): 0.02259, RMSE: 0.2259, MAE: 0.1147, menunjukan nilai rendah yang berarti model dapat memprediksi dengan cukup akurat dan prediksi rating mendekati rata-rata nilai actual.
+- Secara performa model juga membuktikan hasil yang baik dengan hasil pengujian _User Based Recommendation Function_, dan _Item Based Recommendation Function_ yang berhasil memberikan top-N recommendation sebagai output.
 - Dalam penelitian ini data telah diproses dan disiapkan dengan baik melalui langkah-langkah seperti _Handling Unknown Values_, _Handling Missing Values_, _Feature Scaling_, _Encoding Identifiers_, _Shuffling and Splitting Data_. Alhasil dapat digunakan dengan baik pada tahap pelatihan dan pengujian.
 - Dari penelitian ini dapat dilihat bahwa pendekatan _machine learning_ dalam hal model weight dan fungsi recommender berdampak untuk menginkatkan efesiensi rekomendasi judul anime kepada pengguna berdasarkan preferensi user / judul anime.
      
